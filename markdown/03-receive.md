@@ -123,10 +123,8 @@ The channel can be configured to *enable* prefetching.
 This means multiple messages can be sent to the client (our pika client)
 and get processed as usual.
 
-This is done by using **prefetch**.
+This is done by calling `basic_qos(prefetch_count=n)`.
 When a channel starts fetching messages, it will always try to buffer this amount. 
-
-> channel.basic_qos(prefetch_count=5)
 
 **NOTE:** Batching is a two-way street.
 If messages are acknowledged one-by-one, the queue will be refilled one-by-one.
@@ -134,8 +132,35 @@ This causes I/O and negates the benefits of batching.
 To properly implement batching, use the basic_ack on the last message and
 use the `multiple=True` flag.
 
-> channel.basic_ack(delivery_tag=deliver.delivery_tag, multiple=True)
-
 It can be difficult to determine *when* there are no more pending messages.
 It is recommended to buffer these messages internally so workers can "look ahead"
 and apply the `basic_ack` when the buffer length indicates an end.
+
+**Example:**
+```python
+import pika
+from pika.channel import Channel
+from pika.spec import Basic, BasicProperties
+
+count = 0
+
+def my_handler(channel: Channel, deliver: Basic.Deliver, props: BasicProperties, data: bytes):
+    global count
+    print(channel, deliver.routing_key, '>', data.decode('utf-8'))
+    count += 1
+    if count == 5:
+        channel.basic_ack(delivery_tag=deliver.delivery_tag, multiple=True)
+        count = 0
+
+def main():
+    con: pika.BlockingConnection = ...
+    channel = con.channel()
+    channel.basic_qos(prefetch_count=5)
+    channel.queue_declare('hello')
+    channel.basic_consume(
+        'rmq_test',
+        on_message_callback=my_handler,
+        auto_ack=False  # FALSE
+    )
+main()
+```
