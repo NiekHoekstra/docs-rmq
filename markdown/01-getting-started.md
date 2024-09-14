@@ -61,7 +61,8 @@ For the sake of clarity, a `BlockingConnection` is used. <br>(for more details, 
 ```python
 import pika
 params = pika.ConnectionParameters(
-    host='localhost'
+    host='localhost',
+    credentials=pika.PlainCredentials('guest', 'guest')
 )
 con: pika.BlockingConnection = pika.BlockingConnection(params)
 print("Connection is", "open" if con.is_open else "closed")
